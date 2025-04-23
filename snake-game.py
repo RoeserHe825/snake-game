@@ -1,202 +1,128 @@
 import pygame
-from pygame.locals import *
+import sys
 import random
+from pygame.locals import *
 
 pygame.init()
+pygame.mixer.init() # initialize mixer
 
-# background music
-BACKGROUND_SOUND = 'atomic-cat.ogg'
-pygame.mixer.init()
-pygame.mixer.music.load(BACKGROUND_SOUND) 
-pygame.mixer.music.play(-1)
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+TITLE = "Snake Game"
 
-screen_width = 600
-screen_height = 600
-screen = pygame.display.set_mode((screen_width, screen_height))
-pygame.display.set_caption('Snake')
+# create game window
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption(TITLE)
 
-# define font
-font = pygame.font.SysFont(None, 40)
-
-# setup a rectangle for "Play Again" option
-again_rect = Rect(screen_width // 2 - 80, screen_height // 2, 160, 50)
-
-# define snake variables
-snake_pos = [[int(screen_width / 2), int(screen_height / 2)]]
-snake_pos.append([300,310])
-snake_pos.append([300,320])
-snake_pos.append([300,330])
+# game variables and constants
+CELL_SIZE = 10
 direction = 1 #1 is up, 2 is right, 3 is down, 4 is left
-
-# define game variables
-cell_size = 10
 update_snake = 0
-food = [0, 0]
-new_food = True
-new_piece = [0, 0]
-game_over = False
-clicked = False
-score = 0
+score = 0 # initialize score
 
-# define colors
-bg = (255, 200, 150)
-body_inner = (50, 175, 25)
-body_outer = (100, 100, 200)
-food_col = (200, 50, 50)
-blue = (0, 0, 255)
-red = (255, 0, 0)
-head_inner = (255, 0, 0)  # red color for snake head inner
-head_outer = (150, 0, 0)  # darker red for snake head outer
+snake_pos = [[int(SCREEN_WIDTH / 2), int(SCREEN_HEIGHT / 2)]] # head of snake
+snake_pos.append([int(SCREEN_WIDTH / 2), int(SCREEN_HEIGHT / 2) + CELL_SIZE]) # body segment 
+snake_pos.append([int(SCREEN_WIDTH / 2), int(SCREEN_HEIGHT / 2) + CELL_SIZE * 2]) # body segment 
+snake_pos.append([int(SCREEN_WIDTH / 2), int(SCREEN_HEIGHT / 2) + CELL_SIZE * 3]) # body segment 
+
+BG = (255, 200, 150)
+RED = (255, 0, 0)
+BLACK = (0, 0, 0)
+BODY_INNER = (50, 175, 25)
+BODY_OUTER = (100, 100, 200)
+APPLE_COLOR = (255, 0, 0)
+
+# define apple position
+apple_pos = [random.randint(0, SCREEN_WIDTH // CELL_SIZE - 1) * CELL_SIZE,
+            random.randint(0, SCREEN_HEIGHT // CELL_SIZE - 1) * CELL_SIZE]
+
+# font for score
+font = pygame.font.SysFont(None, 35)
+
+# load and play background music
+pygame.mixer.music.load('atomic-cat.ogg')
+
+pygame.mixer.music.set_volume(0.5) # set initial volume to 50%
+
+pygame.mixer.music.play(-1) # play the music in a loop
 
 def draw_screen():
-    screen.fill(bg)
+    screen.fill(BG)
+
+def draw_apple():
+    pygame.draw.rect(screen, APPLE_COLOR, (apple_pos[0], apple_pos[1], CELL_SIZE, CELL_SIZE))
 
 def draw_score():
-    score_txt = 'Score: ' + str(score)
-    score_img = font.render(score_txt, True, blue)
-    screen.blit(score_img, (0, 0))
+    score_text = font.render(f"Score: {score}", True, BLACK)
+    screen.blit(score_text, [10, 10])
 
-def check_game_over(game_over):
-    # first check is to see if the snake has eaten itself by checking if the head has clashed with the rest of the body
-    head_count = 0
-    for x in snake_pos:
-        if snake_pos[0] == x and head_count > 0:
-            game_over = True 
-        head_count += 1
-    
-    # second check is to see if the snake has gone out of bounds
-    if snake_pos[0][0] < 0 or snake_pos[0][0] > screen_width or snake_pos[0][1] < 0 or snake_pos[0][1] > screen_height:
-        game_over = True
-    
-    return game_over
-
-def draw_game_over():
-    over_text = "Game Over!"
-    over_img = font.render(over_text, True, blue)
-    pygame.draw.rect(screen, red, (screen_width // 2 - 80, screen_height // 2 - 60, 160, 50))
-    screen.blit(over_img, (screen_width // 2 - 80, screen_height // 2 - 50))
-    
-    again_text = "Play Again?" 
-    again_img = font.render(again_text, True, blue)
-    pygame.draw.rect(screen, red, again_rect)
-    screen.blit(again_img, (screen_width // 2 -80, screen_height // 2 + 10))
-
-run = True
-while run:
-    
+running = True
+while running:
     draw_screen()
+    draw_apple()
     draw_score()
-    
+
+    # loop through events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            run = False
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP and direction !=3:
+            running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_UP and direction !=3: # up
                 direction = 1
-            if event.key == pygame.K_RIGHT and direction !=4:
+            elif event.key == pygame.K_RIGHT and direction != 4: # right
                 direction = 2
-            if event.key == pygame.K_DOWN and direction !=1:
+            elif event.key == pygame.K_DOWN and direction != 1: # down
                 direction = 3
-            if event.key == pygame.K_LEFT and direction !=2:
+            elif event.key == pygame.K_LEFT and direction != 2: # left
                 direction = 4
+    
+    # add timer
+    if update_snake > 99:
+        update_snake = 0
 
-    # create food 
-    if new_food == True:
-        new_food = False
-        food[0] = cell_size * random.randint(0, (screen_width / cell_size) - 1)
-        food[1] = cell_size * random.randint(0, (screen_height / cell_size) - 1)
+        # move the snake 
+        head_x, head_y = snake_pos[0]
 
-    # draw food
-    pygame.draw.rect(screen, food_col, (food[0], food[1], cell_size, cell_size))
+        if direction == 1: # up
+            head_y -= CELL_SIZE
+        elif direction == 2: # right
+            head_x += CELL_SIZE
+        elif direction == 3: # down
+            head_y += CELL_SIZE
+        elif direction == 4: # left
+            head_x -= CELL_SIZE
 
-    # check if food has been eaten 
-    if snake_pos[0] == food:
-        new_food = True
-        # create new piece at the last point of the snake's tail
-        new_piece = list(snake_pos[-1])
-        
-        # add extra piece to the snake
-        if direction == 1:
-            new_piece[1] += cell_size
-        # heading down
-        if direction == 3:
-            new_piece[1] -= cell_size
-        # heading right 
-        if direction == 2:
-            new_piece[0] -= cell_size
-        # heading left
-        if direction == 4:
-            new_piece[0] += cell_size
-            
-        # attach new peice to the end of the snake
-        snake_pos.append(new_piece)
-        
-        # increase score
-        score += 1
+        # update the snake's position
+        snake_pos.insert(0, [head_x, head_y]) # add new head
+        snake_pos.pop() # remove the last segment
 
-    if game_over == False:
-        # update snake
-        if update_snake > 99:
-            update_snake = 0
-            # first shift the positions of each snake piece back
-            snake_pos = snake_pos[-1:] + snake_pos[:-1]
-            
-            # update the position of the head based on direction
-            # heading up
-            if direction == 1:
-                snake_pos[0][0] = snake_pos[1][0]
-                snake_pos[0][1] = snake_pos[1][1] - cell_size
-            # heading down
-            if direction == 3:
-                snake_pos[0][0] = snake_pos[1][0]
-                snake_pos[0][1] = snake_pos[1][1] + cell_size
-            # heading right
-            if direction == 2:
-                snake_pos[0][1] = snake_pos[1][1]
-                snake_pos[0][0] = snake_pos[1][0] + cell_size
-            # heading left
-            if direction == 4:
-                snake_pos[0][1] = snake_pos[1][1]
-                snake_pos[0][0] = snake_pos[1][0] - cell_size
-                
-            game_over = check_game_over(game_over)
+        # check for collision with apple
+        if snake_pos[0] == apple_pos:
+            apple_pos = [random.randint(0, SCREEN_WIDTH // CELL_SIZE - 1) * CELL_SIZE,
+                         random.randint(0, SCREEN_HEIGHT // CELL_SIZE - 1) * CELL_SIZE]
+            snake_pos.append(snake_pos[-1]) # add new segment to snake
+            score += 1 # increment score if snake eats apple
 
-    if game_over == True:
-        draw_game_over()
-        if event.type == pygame.MOUSEBUTTONDOWN and clicked == False:
-            clicked = True
-        if event.type == pygame.MOUSEBUTTONUP and clicked == True:
-            clicked = False
-            # reset variables
-            game_over = False
-            update_snake = 0
-            food = [0, 0]
-            new_food = True
-            new_piece = [0, 0]
-            score = 0
-            # define snake variables
-            snake_pos = [[int(screen_width / 2), int(screen_height / 2)]]
-            snake_pos.append([300, 310])
-            snake_pos.append([300, 320])
-            snake_pos.append([300, 330])
-            direction = 1
+        # check for collision with screen boundaries
+        if head_x < 0 or head_x >= SCREEN_WIDTH or head_y < 0 or head_y >= SCREEN_HEIGHT:
+            running = False # Exit the game
+    # draw snake
+    for i in range(len(snake_pos)):
+        segment = snake_pos[i]
+        if i == 0: # head
+            pygame.draw.rect(screen, BODY_OUTER, (segment[0], segment[1], CELL_SIZE, CELL_SIZE))
+ 
+            pygame.draw.rect(screen, RED, (segment[0] + 1, segment[1] + 1, CELL_SIZE - 2, CELL_SIZE - 2))
+        else: # body
+            pygame.draw.rect(screen, BODY_OUTER, (segment[0], segment[1], CELL_SIZE, CELL_SIZE))
+ 
+            pygame.draw.rect(screen, BODY_INNER, (segment[0] + 1, segment[1] + 1, CELL_SIZE - 2, CELL_SIZE - 2))
 
-    # draw the snake
-    head = 1
-    for x in snake_pos:
-        if head == 1:
-            # draw the head in red
-            pygame.draw.rect(screen, head_outer, (x[0], x[1], cell_size, cell_size))
-            pygame.draw.rect(screen, head_inner, (x[0] + 1, x[1] + 1, cell_size - 2, cell_size - 2))
-            head = 0
-        else:
-            # draw the body in green
-            pygame.draw.rect(screen, body_outer, (x[0], x[1], cell_size, cell_size))
-            pygame.draw.rect(screen, body_inner, (x[0] + 1, x[1] + 1, cell_size - 2, cell_size - 2))
+    # update display
+    pygame.display.flip()
 
-   
-
-    pygame.display.update()
     update_snake += 1
 
+# exit pygame
 pygame.quit()
+sys.exit()
